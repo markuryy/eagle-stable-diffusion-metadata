@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Stable Diffusion Metadata</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            font-size: 11px;
+            padding-bottom: 10px;
+            color: #ccc;
+            background: transparent;
+            overflow: hidden;
+        }
+
+        #metadata {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            background-color: #222;
+            color: #ddd;
+            padding: 8px;
+            padding-top: 0px;
+            margin: 0;
+            border-radius: 4px;
+            overflow: hidden;
+            max-height: 150px;
+        }
+
+        button {
+            font-size: 11px;
+            padding: 4px 8px;
+            border-radius: 4px;
+            background-color: #444;
+            color: #eee;
+            border: none;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div id="metadataContainer">
+        <pre id="metadata"></pre>
+    </div>
+    <button id="toggleButton">Expand</button>
+    <button id="downloadButton">Export Raw Metadata</button>
+    <script src="js/plugin.js"></script>
+</body>
+</html>
