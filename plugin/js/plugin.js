@@ -68,7 +68,7 @@ eagle.onPluginCreate(async (plugin) => {
         const cleanFullMetadata = cleanMetadata(fullMetadataString);
         const truncatedMetadata = truncateString(cleanFullMetadata, 500);
         metadataElement.textContent = truncatedMetadata;
-        setupUI(cleanFullMetadata, truncatedMetadata);
+        setupUI(cleanFullMetadata, truncatedMetadata, selectedItem[0].id);
       } else {
         console.error('Failed to read metadata');
       }
@@ -78,9 +78,11 @@ eagle.onPluginCreate(async (plugin) => {
   }
 });
 
-function setupUI(fullText, truncatedText) {
+function setupUI(fullText, truncatedText, itemId) {
   const toggleButton = document.getElementById('toggleButton');
   const metadataElement = document.getElementById('metadata');
+  const appendToNotesButton = document.getElementById('appendToNotesButton');
+  const moreOptionsButton = document.getElementById('moreOptionsButton');
   let isExpanded = false;
 
   toggleButton.addEventListener('click', () => {
@@ -104,6 +106,91 @@ function setupUI(fullText, truncatedText) {
       });
     }
   });
+
+  appendToNotesButton.addEventListener('click', async () => {
+    await appendMetadataToNotes(itemId, fullText);
+  });
+
+  moreOptionsButton.addEventListener('click', () => {
+    eagle.contextMenu.open([
+      {
+        id: "bulkUpdate",
+        label: "Bulk Update All Items",
+        click: async () => {
+          const result = await eagle.dialog.showMessageBox({
+            type: 'question',
+            buttons: ['Yes', 'No'],
+            title: 'Confirm Bulk Update',
+            message: 'This will append metadata to notes for all Stable Diffusion images in your library. This may take a while and is not recommended if you have ComfyUI images. Do you want to continue?'
+          });
+
+          if (result.response === 0) { // User clicked 'Yes'
+            await bulkUpdateNotes();
+          }
+        }
+      }
+    ]);
+  });
+}
+
+async function appendMetadataToNotes(itemId, metadata) {
+  try {
+    const item = await eagle.item.getById(itemId);
+    const currentAnnotation = item.annotation || '';
+    
+    // Check if metadata is already in the notes
+    if (currentAnnotation.includes(metadata)) {
+      console.log('Metadata already exists in notes. Skipping append.');
+      return;
+    }
+    
+    const updatedAnnotation = currentAnnotation + (currentAnnotation ? '\n\n' : '') + metadata;
+    item.annotation = updatedAnnotation;
+    await item.save();
+    console.log('Metadata appended to notes successfully');
+  } catch (error) {
+    console.error('Error appending metadata to notes:', error);
+  }
+}
+
+async function bulkUpdateNotes() {
+  try {
+    const allItems = await eagle.item.getAll();
+    let updatedCount = 0;
+
+    for (const item of allItems) {
+      if (item.ext.toLowerCase() === 'png') {
+        const reader = new ImageDataReader(item.filePath);
+        await new Promise((resolve) => {
+          reader.readData(async (status, metadata) => {
+            if (status === 'SUCCESS' && Object.keys(metadata).length > 0) {
+              const metadataString = JSON.stringify(metadata, null, 2);
+              const cleanMetadataString = cleanMetadata(metadataString);
+              const currentAnnotation = item.annotation || '';
+              
+              // Check if metadata is already in the notes
+              if (!currentAnnotation.includes(cleanMetadataString)) {
+                const updatedAnnotation = currentAnnotation + (currentAnnotation ? '\n\n' : '') + cleanMetadataString;
+                item.annotation = updatedAnnotation;
+                await item.save();
+                updatedCount++;
+              }
+            }
+            resolve();
+          });
+        });
+      }
+    }
+
+    console.log(`Bulk update completed. Updated ${updatedCount} items.`);
+    await eagle.dialog.showMessageBox({
+      type: 'info',
+      title: 'Bulk Update Completed',
+      message: `Updated ${updatedCount} items with Stable Diffusion metadata.`
+    });
+  } catch (error) {
+    console.error('Error during bulk update:', error);
+  }
 }
 
 function truncateString(str, maxLength) {
@@ -111,5 +198,9 @@ function truncateString(str, maxLength) {
 }
 
 function cleanMetadata(metadata) {
-  return metadata.replace(/\\/g, '').replace(/^\{|\}$/g, '');
+  return metadata
+    .replace(/^\{|\}$/g, '') // Remove outer curly braces
+    .replace(/\\n/g, '\n') // Replace \n with actual newlines
+    .replace(/\\"/g, '"') // Replace \" with "
+    .trim(); // Trim any leading/trailing whitespace
 }
